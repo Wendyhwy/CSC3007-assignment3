@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    .area {
+          stroke: rgb(177, 108, 218);
+          stroke-width: 1px;
+    }
+
+    .area.selected {
+          stroke: #242526;
+          stroke-width: 2px;
+    }
+
+    .tooltip {
+    position: absolute;
+    background-color: rgba(51, 48, 48, 0.85);
+    color: white;
+    font-size: 12;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 1%;
+    border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+<svg></svg>
+<div class="tooltip"></div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<script>
+
+// create map
+let popData = new Map();
+
+let width = 1000, height = 600;
+
+let svg = d3.select("svg")
+    .attr("viewBox", "0 0 " + width + " " + height)
+
+// Load external data
+Promise.all([d3.json("sgmap.json"), d3.csv("population2021.csv", function(d) {
+    // stores value by key
+    popData.set(d.Subzone.toUpperCase(), d.Population)
+})]).then(data => {
+
+console.log(data[0]);
+console.log(data[1]);
+console.log(popData);
+// Map and projection
+var projection = d3.geoMercator()
+    .center([103.851959, 1.290270])
+    .fitExtent([[20, 20], [980, 580]], data[0]);
+
+let geopath = d3.geoPath().projection(projection);
+
+// set color range and domain 
+let popDomain = [0, 100, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
+let popRange = ["#f7fcfd","#e0ecf4","#bfd3e6","#9ebcda","#8c96c6","#8c6bb1","#88419d","#810f7c","#4d004b"];
+
+let colorScale = d3.scaleThreshold()
+  .domain(popDomain)
+  .range(popRange);
+
+svg.append("g")
+    .attr("id", "districts")
+    .selectAll("path")
+    .data(data[0].features)
+    .enter()
+    .append("path")
+    .attr("d", geopath)
+    .attr("fill", function(d) {
+        d.pop = popData.get(d.properties.Name)||0;
+        return colorScale(d.pop);
+    })
+    .attr("class", "area")
+    // mouse hover over area and display text
+    .on("mouseover", (event, d) => {
+            d3.select(".tooltip")
+            .text(`${d.properties.Name}'s Population: ${d.pop}`)
+            .style("left", (event.pageX) + "px")
+            .style("top", (event.pageY) + "px");
+        
+            d3.select(event.currentTarget) 
+            .classed("selected",true)
+        })
+
+    .on("mouseout", (event, d) => {
+        d3.select(".tooltip")
+        d3.select(event.currentTarget) 
+        .classed("selected",false)
+    })
+
+    // legend scale
+    var legend = svg.selectAll("g.legend")
+    .data(popDomain)
+    .enter().append("g")
+    .attr("class", "legend");
+    
+    var legendWidth = 25, legendHeight = 25;
+    
+    legend.append("rect")
+    .attr("width", legendWidth)
+    .attr("height", legendHeight)
+    .attr("x", 15)
+    .attr("y", function(d, i){ return height/2 - (i*legendHeight) - 2*legendHeight;})
+    .style("fill", function(d, i) { return colorScale(d); })
+    .style("opacity", 0.9);
+    
+    legend.append("text")
+    .attr("x", 45)
+    .attr("y", function(d, i){ return height/2 - (i*legendHeight) - legendHeight - 4;})
+    .text(function(d, i){ return popDomain[i]; });
+})
+
+</script>
+</body>
+</html>
